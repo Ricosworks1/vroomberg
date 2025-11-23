@@ -16,6 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      {/* Deployment Version: 1f0e8bb - API Integration Fix */}
       <body className={inter.className}>{children}</body>
     </html>
   );
