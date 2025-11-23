@@ -11,25 +11,17 @@ export interface WalletConnection {
   chainId: number;
 }
 
-export async function connectWallet(forceSelect = false): Promise<WalletConnection> {
+export async function connectWallet(): Promise<WalletConnection> {
   if (typeof window === 'undefined' || !window.ethereum) {
     throw new Error('MetaMask not installed. Please install MetaMask to continue.');
   }
 
   const provider = new BrowserProvider(window.ethereum);
 
-  // If forceSelect is true, request new permissions to force account selection dialog
-  if (forceSelect) {
-    await window.ethereum.request({
-      method: 'wallet_requestPermissions',
-      params: [{ eth_accounts: {} }]
-    });
-  }
-
   // Request account access - this will return the currently selected account in MetaMask
   const accounts = await provider.send("eth_requestAccounts", []);
 
-  // Force use of the current MetaMask account (handles account switching)
+  // Use the current MetaMask account
   const signer = await provider.getSigner(accounts[0]);
   const address = await signer.getAddress();
   const network = await provider.getNetwork();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { connectWallet, shortenAddress, WalletConnection } from '@/lib/wallet';
 
 interface WalletConnectProps {
@@ -10,14 +10,51 @@ interface WalletConnectProps {
 export default function WalletConnect({ onConnect }: WalletConnectProps) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detectedAccount, setDetectedAccount] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Detect currently selected MetaMask account
+    const detectAccount = async () => {
+      if (typeof window !== 'undefined' && window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts && accounts.length > 0) {
+            setDetectedAccount(accounts[0]);
+          }
+        } catch (err) {
+          // Silently fail - user hasn't connected yet
+        }
+      }
+    };
+    detectAccount();
+  }, []);
+
+  const handleChangeAccount = async () => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        // Request new permissions to show account selection
+        await window.ethereum.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }]
+        });
+        // Refresh detected account
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts && accounts.length > 0) {
+          setDetectedAccount(accounts[0]);
+        }
+      } catch (err) {
+        // User cancelled
+      }
+    }
+  };
 
   const handleConnect = async () => {
     setConnecting(true);
     setError(null);
 
     try {
-      // Pass forceSelect=true to show account selection dialog
-      const wallet = await connectWallet(true);
+      // Connect with the currently selected MetaMask account
+      const wallet = await connectWallet(false);
       onConnect(wallet);
     } catch (err: any) {
       // Handle different error types with user-friendly messages
@@ -80,6 +117,23 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
             </p>
           </div>
 
+          {detectedAccount && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-xs text-blue-800 dark:text-blue-300 font-semibold mb-1">
+                MetaMask Account Detected:
+              </p>
+              <p className="text-sm font-mono text-blue-900 dark:text-blue-200 mb-2">
+                {shortenAddress(detectedAccount)}
+              </p>
+              <button
+                onClick={handleChangeAccount}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Change Account →
+              </button>
+            </div>
+          )}
+
           <button
             onClick={handleConnect}
             disabled={connecting}
@@ -94,7 +148,7 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
                 Connecting...
               </span>
             ) : (
-              'Connect MetaMask'
+              detectedAccount ? `Connect with ${shortenAddress(detectedAccount)}` : 'Connect MetaMask'
             )}
           </button>
 
@@ -113,10 +167,10 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
 
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left">
           <p className="text-xs text-blue-800 dark:text-blue-300 font-semibold mb-2">
-            💡 Switching accounts:
+            💡 Need to use a different account?
           </p>
           <p className="text-xs text-blue-700 dark:text-blue-400">
-            Click "Connect MetaMask" to select any account from your wallet. MetaMask will show you all available accounts to choose from.
+            Click the "Change Account" link above to select a different wallet from your MetaMask.
           </p>
         </div>
       </div>
