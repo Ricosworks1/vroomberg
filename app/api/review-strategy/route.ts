@@ -66,21 +66,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Type coercion: Ensure numeric fields are numbers, not strings
+    const totalBalanceUsd = typeof strategy.total_balance_usd === 'number'
+      ? strategy.total_balance_usd
+      : parseFloat(strategy.total_balance_usd as any) || 0;
+
+    // Ensure grid order amounts and prices are numbers
+    const validatedGridOrders = strategy.grid_orders.map(order => ({
+      ...order,
+      price: typeof order.price === 'number' ? order.price : parseFloat(order.price as any) || 0,
+      amount_usd: typeof order.amount_usd === 'number' ? order.amount_usd : parseFloat(order.amount_usd as any) || 0,
+    }));
+
     console.log(`Reviewing strategy for wallet: ${strategy.wallet_address}`);
 
     // Calculate total allocation
-    const totalAllocation = strategy.grid_orders.reduce(
+    const totalAllocation = validatedGridOrders.reduce(
       (sum, order) => sum + order.amount_usd,
       0
     );
     const allocationPercentage =
-      (totalAllocation / strategy.total_balance_usd) * 100;
+      (totalAllocation / totalBalanceUsd) * 100;
 
     // Format grid orders for review
-    const gridOrdersSummary = strategy.grid_orders
+    const gridOrdersSummary = validatedGridOrders
       .map(
         (order, idx) =>
-          `${idx + 1}. ${order.type.toUpperCase()} at $${order.price} for $${order.amount_usd} - ${order.trigger_condition}`
+          `${idx + 1}. ${order.type.toUpperCase()} at $${order.price.toFixed(2)} for $${order.amount_usd.toFixed(2)} - ${order.trigger_condition}`
       )
       .join('\n');
 
@@ -107,7 +119,7 @@ Strategy Warnings:
 ${strategy.warnings.map((w, i) => `${i + 1}. ${w}`).join('\n')}
 
 Portfolio Context:
-- Total Balance: $${strategy.total_balance_usd.toFixed(2)}
+- Total Balance: $${totalBalanceUsd.toFixed(2)}
 - Allocation: ${allocationPercentage.toFixed(1)}%
 
 YOUR TASK:
