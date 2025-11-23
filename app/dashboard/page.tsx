@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/wallet';
 import TradingDashboard from '@/components/TradingDashboard';
 
+// Type augmentation for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 interface PortfolioToken {
   token_address: string;
   token_symbol: string;
@@ -40,6 +47,27 @@ export default function Dashboard() {
     }
     setWalletAddress(address);
     fetchPortfolio(address);
+
+    // Listen for MetaMask account changes
+    if (window.ethereum) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length === 0) {
+          // User disconnected in MetaMask
+          handleDisconnect();
+        } else if (accounts[0].toLowerCase() !== address.toLowerCase()) {
+          // User switched to a different account
+          sessionStorage.setItem('walletAddress', accounts[0]);
+          setWalletAddress(accounts[0]);
+          fetchPortfolio(accounts[0]);
+        }
+      };
+
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+      return () => {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      };
+    }
   }, [router]);
 
   const fetchPortfolio = async (address: string) => {
@@ -65,8 +93,11 @@ export default function Dashboard() {
   };
 
   const handleDisconnect = () => {
+    // Clear session storage
     sessionStorage.removeItem('walletAddress');
-    router.push('/');
+
+    // Force page reload to clear all state and MetaMask connection
+    window.location.href = '/';
   };
 
   const formatCurrency = (value: number): string => {
