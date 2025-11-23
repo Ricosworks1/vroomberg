@@ -241,6 +241,12 @@ export default function AutonomousEngine({
 
   // Start/stop engine
   useEffect(() => {
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (settings.enabled) {
       addLog('🚀 Autonomous trading engine started', 'success');
 
@@ -249,24 +255,23 @@ export default function AutonomousEngine({
 
       // Set up interval
       intervalRef.current = setInterval(
-        monitoringLoop,
+        () => {
+          monitoringLoop();
+        },
         settings.checkIntervalMinutes * 60 * 1000
       );
     } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        addLog('⏹️ Autonomous trading engine stopped', 'warning');
-      }
+      addLog('⏹️ Autonomous trading engine stopped', 'warning');
       setEngineStatus('idle');
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [settings.enabled, settings.checkIntervalMinutes]);
+  }, [settings.enabled, settings.checkIntervalMinutes, settings.autoExecute, settings.maxAllocationPercent, settings.maxDailyLossPercent, walletAddress, totalBalance]);
 
   // Reset daily PnL at midnight
   useEffect(() => {
