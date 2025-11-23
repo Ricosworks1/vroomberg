@@ -333,8 +333,7 @@ export default function AutonomousEngine({
           <select
             value={settings.riskTolerance}
             onChange={(e) => setSettings(prev => ({ ...prev, riskTolerance: e.target.value as any }))}
-            disabled={settings.enabled}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
           >
             <option value="conservative">Conservative (Low Risk)</option>
             <option value="moderate">Moderate (Medium Risk)</option>
@@ -353,8 +352,7 @@ export default function AutonomousEngine({
             max="50"
             value={settings.maxAllocationPercent}
             onChange={(e) => setSettings(prev => ({ ...prev, maxAllocationPercent: Number(e.target.value) }))}
-            disabled={settings.enabled}
-            className="w-full disabled:opacity-50"
+            className="w-full cursor-pointer accent-blue-600"
           />
         </div>
 
@@ -369,8 +367,7 @@ export default function AutonomousEngine({
             max="20"
             value={settings.maxDailyLossPercent}
             onChange={(e) => setSettings(prev => ({ ...prev, maxDailyLossPercent: Number(e.target.value) }))}
-            disabled={settings.enabled}
-            className="w-full disabled:opacity-50"
+            className="w-full cursor-pointer accent-red-600"
           />
         </div>
 
@@ -382,8 +379,7 @@ export default function AutonomousEngine({
           <select
             value={settings.checkIntervalMinutes}
             onChange={(e) => setSettings(prev => ({ ...prev, checkIntervalMinutes: Number(e.target.value) }))}
-            disabled={settings.enabled}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 disabled:opacity-50"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
           >
             <option value="5">5 minutes</option>
             <option value="15">15 minutes</option>
@@ -407,8 +403,7 @@ export default function AutonomousEngine({
           </div>
           <button
             onClick={() => setSettings(prev => ({ ...prev, autoExecute: !prev.autoExecute }))}
-            disabled={settings.enabled}
-            className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors disabled:opacity-50 ${
+            className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors cursor-pointer hover:opacity-90 ${
               settings.autoExecute
                 ? 'bg-blue-600 dark:bg-blue-500'
                 : 'bg-gray-300 dark:bg-gray-600'
