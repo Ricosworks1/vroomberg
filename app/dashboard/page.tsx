@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/wallet';
 import TradingDashboard from '@/components/TradingDashboard';
+import AutonomousEngine from '@/components/AutonomousEngine';
 
 // Type augmentation for window.ethereum
 declare global {
@@ -489,6 +490,12 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+
+            {/* Autonomous Trading Engine */}
+            <AutonomousEngine
+              walletAddress={portfolio.wallet_address}
+              totalBalance={portfolio.total_balance_usd}
+            />
 
             {/* AI Trading Dashboard */}
             <TradingDashboard
