@@ -16,7 +16,8 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
     setError(null);
 
     try {
-      const wallet = await connectWallet();
+      // Pass forceSelect=true to show account selection dialog
+      const wallet = await connectWallet(true);
       onConnect(wallet);
     } catch (err: any) {
       // Handle different error types with user-friendly messages
@@ -112,13 +113,11 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
 
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left">
           <p className="text-xs text-blue-800 dark:text-blue-300 font-semibold mb-2">
-            💡 To switch to a different wallet:
+            💡 Switching accounts:
           </p>
-          <ol className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-decimal list-inside">
-            <li>Open MetaMask and switch to the account you want</li>
-            <li>Click "Connect MetaMask" above</li>
-            <li>The new account will be connected automatically</li>
-          </ol>
+          <p className="text-xs text-blue-700 dark:text-blue-400">
+            Click "Connect MetaMask" to select any account from your wallet. MetaMask will show you all available accounts to choose from.
+          </p>
         </div>
       </div>
     </div>
