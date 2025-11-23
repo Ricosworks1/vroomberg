@@ -18,10 +18,11 @@ export async function connectWallet(): Promise<WalletConnection> {
 
   const provider = new BrowserProvider(window.ethereum);
 
-  // Request account access
-  await provider.send("eth_requestAccounts", []);
+  // Request account access - this will return the currently selected account in MetaMask
+  const accounts = await provider.send("eth_requestAccounts", []);
 
-  const signer = await provider.getSigner();
+  // Force use of the current MetaMask account (handles account switching)
+  const signer = await provider.getSigner(accounts[0]);
   const address = await signer.getAddress();
   const network = await provider.getNetwork();
 

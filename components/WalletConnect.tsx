@@ -109,6 +109,17 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
           <p>✓ Your keys, your control</p>
           <p>✓ Powered by AI & Octav API</p>
         </div>
+
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-left">
+          <p className="text-xs text-blue-800 dark:text-blue-300 font-semibold mb-2">
+            💡 To switch to a different wallet:
+          </p>
+          <ol className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-decimal list-inside">
+            <li>Open MetaMask and switch to the account you want</li>
+            <li>Click "Connect MetaMask" above</li>
+            <li>The new account will be connected automatically</li>
+          </ol>
+        </div>
       </div>
     </div>
   );
