@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const OCTAV_API_URL = process.env.NEXT_PUBLIC_OCTAV_API_URL || 'https://api.octav.fi';
-const OCTAV_API_KEY = process.env.OCTAV_API_KEY;
+const OCTAV_API_KEY = process.env.OCTAV_API_KEY?.trim();
 
 interface PortfolioToken {
   token_address: string;
