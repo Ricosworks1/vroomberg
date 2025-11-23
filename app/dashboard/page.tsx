@@ -35,6 +35,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
+  const [hyperliquidBalance, setHyperliquidBalance] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,15 +76,32 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/portfolio?address=${address}`);
+      // Fetch both wallet balance and Hyperliquid balance in parallel
+      const [portfolioResponse, hlResponse] = await Promise.all([
+        fetch(`/api/portfolio?address=${address}`),
+        fetch('/api/hyperliquid-balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address }),
+        }),
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!portfolioResponse.ok) {
+        const errorData = await portfolioResponse.json();
         throw new Error(errorData.error || 'Failed to fetch portfolio');
       }
 
-      const data = await response.json();
-      setPortfolio(data);
+      const portfolioData = await portfolioResponse.json();
+      setPortfolio(portfolioData);
+
+      // Hyperliquid balance is optional - don't fail if it errors
+      if (hlResponse.ok) {
+        const hlData = await hlResponse.json();
+        setHyperliquidBalance(hlData.hyperliquid_balance);
+        console.log('[HYPERLIQUID] Balance loaded:', hlData.hyperliquid_balance);
+      } else {
+        console.warn('[HYPERLIQUID] Failed to fetch balance, continuing without it');
+      }
     } catch (err: any) {
       console.error('Portfolio fetch error:', err);
       setError(err.message || 'Failed to load portfolio');
@@ -181,10 +199,11 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Portfolio Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Balance</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Wallet Balance</p>
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-100">
                     {formatCurrency(portfolio.total_balance_usd)}
                   </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">On-chain tokens</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Tokens</p>
@@ -200,6 +219,89 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Hyperliquid Balance */}
+            {hyperliquidBalance && hyperliquidBalance.account_value_usd > 0 && (
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-xl shadow-lg p-6 border-2 border-purple-200 dark:border-purple-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    Hyperliquid Exchange Balance
+                  </h2>
+                  <a
+                    href="https://app.hyperliquid.xyz/trade"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                  >
+                    Open Hyperliquid →
+                  </a>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Account Value</p>
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {formatCurrency(hyperliquidBalance.account_value_usd)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Available Balance</p>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      {formatCurrency(hyperliquidBalance.available_balance_usd)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Margin Used</p>
+                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                      {formatCurrency(hyperliquidBalance.margin_used_usd)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Open Positions</p>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      {hyperliquidBalance.positions?.length || 0}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Active Positions */}
+                {hyperliquidBalance.positions && hyperliquidBalance.positions.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                      Active Positions
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {hyperliquidBalance.positions.map((pos: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-purple-200 dark:border-purple-700"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-slate-900 dark:text-slate-100">
+                              {pos.coin}
+                            </span>
+                            <span
+                              className={`text-xs px-2 py-1 rounded ${
+                                pos.unrealized_pnl >= 0
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                              }`}
+                            >
+                              {pos.unrealized_pnl >= 0 ? '+' : ''}
+                              {formatCurrency(pos.unrealized_pnl)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                            <div>Size: {pos.size > 0 ? 'LONG' : 'SHORT'} {Math.abs(pos.size).toFixed(4)}</div>
+                            <div>Entry: ${pos.entry_price.toFixed(2)}</div>
+                            <div>Leverage: {pos.leverage.toFixed(1)}x</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Token Holdings */}
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden">
