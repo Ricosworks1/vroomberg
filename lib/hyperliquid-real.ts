@@ -1,7 +1,8 @@
 // Real Hyperliquid DEX integration using @nktkas/hyperliquid SDK
 // ⚠️ WARNING: This places REAL orders with REAL money on Hyperliquid mainnet
 
-import { Hyperliquid } from '@nktkas/hyperliquid';
+// TODO: Fix Hyperliquid SDK import - package uses different export structure
+// import { Hyperliquid } from '@nktkas/hyperliquid';
 import { BrowserProvider, Signer } from 'ethers';
 
 export interface OrderParams {
@@ -24,7 +25,7 @@ export interface OrderResult {
 export class HyperliquidRealClient {
   private signer: Signer | null = null;
   private provider: BrowserProvider | null = null;
-  private sdk: Hyperliquid | null = null;
+  private sdk: any | null = null; // Hyperliquid | null = null;
 
   constructor() {}
 
@@ -45,11 +46,14 @@ export class HyperliquidRealClient {
     const walletAddress = await signer.getAddress();
 
     // Initialize Hyperliquid SDK with custom signer
-    this.sdk = new Hyperliquid({
-      walletAddress,
-      privateKey: undefined, // We'll use custom signing
-      enableWs: false,
-    });
+    // TODO: Fix SDK initialization when correct import is available
+    // this.sdk = new Hyperliquid({
+    //   walletAddress,
+    //   privateKey: undefined, // We'll use custom signing
+    //   enableWs: false,
+    // });
+
+    throw new Error('Hyperliquid real trading temporarily disabled - SDK integration in progress');
 
     return this;
   }
@@ -141,7 +145,7 @@ export class HyperliquidRealClient {
 
     try {
       const meta = await this.sdk.info.meta();
-      const assetInfo = meta.universe.find((u) => u.name === asset);
+      const assetInfo = meta.universe.find((u: any) => u.name === asset);
       return assetInfo;
     } catch (error) {
       console.error('[HYPERLIQUID] Failed to get asset info:', error);

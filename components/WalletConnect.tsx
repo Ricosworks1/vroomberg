@@ -54,7 +54,7 @@ export default function WalletConnect({ onConnect }: WalletConnectProps) {
 
     try {
       // Connect with the currently selected MetaMask account
-      const wallet = await connectWallet(false);
+      const wallet = await connectWallet();
       onConnect(wallet);
     } catch (err: any) {
       // Handle different error types with user-friendly messages
