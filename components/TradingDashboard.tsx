@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { BrowserProvider } from 'ethers';
+import { HyperliquidRealClient, convertStrategyToOrders } from '@/lib/hyperliquid-real';
 
 interface GridOrder {
   type: 'buy' | 'sell';
@@ -46,9 +48,12 @@ export default function TradingDashboard({
   const [review, setReview] = useState<ReviewResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [executing, setExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [marketCondition, setMarketCondition] = useState<'bull' | 'bear' | 'neutral'>('neutral');
   const [selectedToken, setSelectedToken] = useState<string>('');
+  const [executionMode, setExecutionMode] = useState<'simulation' | 'real'>('simulation');
+  const [showExecutionConfirm, setShowExecutionConfirm] = useState(false);
 
   const handleGenerateStrategy = async () => {
     setGenerating(true);
@@ -126,6 +131,22 @@ export default function TradingDashboard({
       return;
     }
 
+    // Show confirmation dialog for real trading
+    if (executionMode === 'real') {
+      setShowExecutionConfirm(true);
+      return;
+    }
+
+    // Simulation mode - safe, no real money
+    await executeSimulation();
+  };
+
+  const executeSimulation = async () => {
+    if (!strategy) return;
+
+    setExecuting(true);
+    setError(null);
+
     try {
       const response = await fetch('/api/execute-strategy', {
         method: 'POST',
@@ -135,8 +156,8 @@ export default function TradingDashboard({
           wallet_address: walletAddress,
           recommended_token: strategy.recommended_token,
           grid_orders: strategy.grid_orders,
-          approved: review.approved,
-          confidence_score: review.confidence_score,
+          approved: review?.approved,
+          confidence_score: review?.confidence_score,
         }),
       });
 
@@ -147,12 +168,81 @@ export default function TradingDashboard({
 
       const data = await response.json();
       alert(
-        `Execution plan created!\n\nExecution ID: ${data.execution_plan.execution_id}\n\nThis would normally trigger wallet signatures for each order. For the MVP demo, order placement is simulated.`
+        `✅ SIMULATION SUCCESSFUL\n\n` +
+        `Execution ID: ${data.execution_plan.execution_id}\n\n` +
+        `${strategy.grid_orders.length} orders simulated\n` +
+        `Total allocation: $${data.execution_plan.total_usd_required.toFixed(2)}\n\n` +
+        `⚠️ No real money was used. This was a simulation.`
       );
     } catch (err: any) {
-      console.error('Execution error:', err);
-      setError(err.message || 'Failed to execute strategy');
+      console.error('Simulation error:', err);
+      setError(err.message || 'Failed to simulate execution');
+    } finally {
+      setExecuting(false);
     }
+  };
+
+  const executeRealTrading = async () => {
+    if (!strategy) return;
+
+    setShowExecutionConfirm(false);
+    setExecuting(true);
+    setError(null);
+
+    try {
+      // Get wallet provider and signer
+      if (typeof window === 'undefined' || !window.ethereum) {
+        throw new Error('MetaMask not found. Please install MetaMask.');
+      }
+
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      // Initialize Hyperliquid client
+      const hlClient = new HyperliquidRealClient();
+      await hlClient.initialize(provider, signer);
+
+      console.log('[REAL TRADING] Initialized Hyperliquid client');
+
+      // Convert strategy to Hyperliquid orders
+      const orders = convertStrategyToOrders(
+        strategy.grid_orders,
+        strategy.recommended_token,
+        strategy.grid_orders[0]?.price || 0
+      );
+
+      console.log('[REAL TRADING] Placing orders:', orders);
+
+      // Place orders on Hyperliquid
+      const results = await hlClient.placeGridOrders(orders);
+
+      // Check results
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+
+      if (successCount > 0) {
+        alert(
+          `✅ REAL ORDERS PLACED ON HYPERLIQUID\n\n` +
+          `Success: ${successCount} orders\n` +
+          `Failed: ${failureCount} orders\n\n` +
+          `⚠️ REAL MONEY WAS USED\n\n` +
+          `Monitor your positions at:\nhttps://app.hyperliquid.xyz/trade`
+        );
+      } else {
+        throw new Error('All orders failed to place');
+      }
+
+    } catch (err: any) {
+      console.error('[REAL TRADING] Error:', err);
+      setError(err.message || 'Failed to execute real trading');
+      alert(`❌ Trading failed: ${err.message}`);
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const cancelExecution = () => {
+    setShowExecutionConfirm(false);
   };
 
   return (
@@ -458,13 +548,190 @@ export default function TradingDashboard({
           </div>
 
           {review.approved && (
-            <button
-              onClick={handleExecuteStrategy}
-              className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-            >
-              Execute Strategy on Hyperliquid
-            </button>
+            <div className="mt-6 space-y-4">
+              {/* Execution Mode Selector */}
+              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border-2 border-slate-200 dark:border-slate-700">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                  Execution Mode
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setExecutionMode('simulation')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      executionMode === 'simulation'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-slate-300 dark:border-slate-600 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                        🔵 Simulation
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Safe testing, no real money
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setExecutionMode('real')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      executionMode === 'real'
+                        ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                        : 'border-slate-300 dark:border-slate-600 hover:border-red-300'
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 mb-1">
+                        ⚠️ Real Trading
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Live orders, real money
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Execute Button */}
+              <button
+                onClick={handleExecuteStrategy}
+                disabled={executing}
+                className={`w-full py-4 px-6 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  executionMode === 'real'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {executing
+                  ? 'Executing...'
+                  : executionMode === 'real'
+                  ? '⚠️ Execute Real Trading on Hyperliquid'
+                  : '🔵 Run Simulation'}
+              </button>
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Real Trading Confirmation Modal */}
+      {showExecutionConfirm && strategy && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              {/* Warning Header */}
+              <div className="bg-red-100 dark:bg-red-900/30 border-2 border-red-500 rounded-lg p-4">
+                <h2 className="text-2xl font-bold text-red-800 dark:text-red-300 mb-2">
+                  ⚠️ REAL MONEY TRADING WARNING
+                </h2>
+                <p className="text-red-700 dark:text-red-400 text-sm">
+                  You are about to place REAL orders on Hyperliquid DEX using REAL money from your wallet.
+                  This is NOT a simulation.
+                </p>
+              </div>
+
+              {/* Strategy Summary */}
+              <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4 space-y-2">
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                  Strategy Details
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-slate-600 dark:text-slate-400">Token:</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">
+                      {strategy.recommended_token}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600 dark:text-slate-400">Risk Level:</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">
+                      {strategy.risk_level.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600 dark:text-slate-400">Number of Orders:</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">
+                      {strategy.grid_orders.length}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600 dark:text-slate-400">Total Allocation:</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">
+                      ${strategy.grid_orders.reduce((sum, o) => sum + o.amount_usd, 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* What Will Happen */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                  What will happen:
+                </h3>
+                <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                  <li className="flex items-start">
+                    <span className="text-green-600 mr-2">1.</span>
+                    MetaMask will ask you to sign each order (you may need to sign multiple times)
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-600 mr-2">2.</span>
+                    {strategy.grid_orders.length} limit orders will be placed on Hyperliquid DEX
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-600 mr-2">3.</span>
+                    Orders will execute when market price reaches your limit prices
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-600 mr-2">4.</span>
+                    You can monitor and cancel orders at{' '}
+                    <a
+                      href="https://app.hyperliquid.xyz/trade"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      app.hyperliquid.xyz
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Risks */}
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">
+                  ⚠️ Risks:
+                </h3>
+                <ul className="space-y-1 text-xs text-yellow-700 dark:text-yellow-400">
+                  <li>• You may lose money if market moves against your positions</li>
+                  <li>• Grid trading works best in ranging markets; trending markets may cause losses</li>
+                  <li>• High volatility may trigger multiple orders rapidly</li>
+                  <li>• Gas fees will apply to each transaction</li>
+                  <li>• Orders are final once placed</li>
+                </ul>
+              </div>
+
+              {/* Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-4">
+                <button
+                  onClick={cancelExecution}
+                  className="px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeRealTrading}
+                  disabled={executing}
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {executing ? 'Placing Orders...' : 'I Understand, Execute'}
+                </button>
+              </div>
+
+              <p className="text-xs text-center text-slate-500 dark:text-slate-400 pt-2">
+                By clicking "I Understand, Execute" you acknowledge the risks and confirm you want to proceed
+                with real money trading.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
