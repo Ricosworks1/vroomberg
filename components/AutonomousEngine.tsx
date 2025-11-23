@@ -80,49 +80,64 @@ export default function AutonomousEngine({
     addLog('🔍 Analyzing market conditions...', 'info');
 
     try {
-      // Generate strategy
+      // First, fetch current portfolio data
+      const portfolioResponse = await fetch(`/api/portfolio?address=${walletAddress}`);
+      if (!portfolioResponse.ok) {
+        throw new Error('Failed to fetch portfolio data');
+      }
+      const portfolioData = await portfolioResponse.json();
+
+      // Generate strategy with portfolio data
       const response = await fetch('/api/generate-strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress }),
+        body: JSON.stringify({
+          wallet_address: walletAddress,
+          total_balance_usd: portfolioData.total_balance_usd,
+          tokens: portfolioData.tokens,
+          market_condition: 'neutral',
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Strategy generation failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Strategy generation failed');
       }
 
       const strategyData = await response.json();
 
-      // Review strategy
+      // Review strategy - send flattened strategy with wallet data
       const reviewResponse = await fetch('/api/review-strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress,
-          strategy: strategyData.strategy,
+          ...strategyData,
+          wallet_address: walletAddress,
+          total_balance_usd: portfolioData.total_balance_usd,
         }),
       });
 
       if (!reviewResponse.ok) {
-        throw new Error('Strategy review failed');
+        const errorData = await reviewResponse.json();
+        throw new Error(errorData.error || 'Strategy review failed');
       }
 
       const reviewData = await reviewResponse.json();
 
-      addLog(`📊 Strategy generated: ${strategyData.strategy.name}`, 'info');
-      addLog(`🤖 Review: ${reviewData.review.decision} (${reviewData.review.confidence}% confidence)`,
-        reviewData.review.decision === 'APPROVED' ? 'success' : 'warning');
+      addLog(`📊 Strategy generated: ${strategyData.strategy_type}`, 'info');
+      addLog(`🤖 Review: ${reviewData.approved ? 'APPROVED' : 'REJECTED'} (${reviewData.confidence_score}% confidence)`,
+        reviewData.approved ? 'success' : 'warning');
 
       setCurrentStrategy({
-        ...strategyData.strategy,
-        review: reviewData.review,
+        ...strategyData,
+        review: reviewData,
       });
 
       // Auto-execute if enabled and approved
-      if (settings.autoExecute && reviewData.review.decision === 'APPROVED' && reviewData.review.confidence >= 70) {
+      if (settings.autoExecute && reviewData.approved && reviewData.confidence_score >= 70) {
         addLog('✅ Strategy approved, executing automatically...', 'success');
-        await executeStrategy(strategyData.strategy);
-      } else if (reviewData.review.decision === 'APPROVED') {
+        await executeStrategy(strategyData);
+      } else if (reviewData.approved) {
         addLog('⏸️ Strategy approved but auto-execute disabled. Awaiting manual confirmation.', 'warning');
       } else {
         addLog('❌ Strategy rejected. Waiting for next cycle.', 'warning');
@@ -478,10 +493,10 @@ export default function AutonomousEngine({
       {currentStrategy && (
         <div className="mt-6 bg-white dark:bg-slate-800 rounded-lg p-4 border-2 border-blue-200 dark:border-blue-700">
           <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            Current Strategy: {currentStrategy.name}
+            Current Strategy: {currentStrategy.strategy_type}
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-            {currentStrategy.description}
+            {currentStrategy.rationale}
           </p>
           <div className="flex items-center gap-4">
             <div>
@@ -494,12 +509,12 @@ export default function AutonomousEngine({
             </div>
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400">Review</p>
-              <p className={`font-semibold ${currentStrategy.review?.decision === 'APPROVED' ? 'text-green-600' : 'text-red-600'}`}>
-                {currentStrategy.review?.decision} ({currentStrategy.review?.confidence}%)
+              <p className={`font-semibold ${currentStrategy.review?.approved ? 'text-green-600' : 'text-red-600'}`}>
+                {currentStrategy.review?.approved ? 'APPROVED' : 'REJECTED'} ({currentStrategy.review?.confidence_score}%)
               </p>
             </div>
           </div>
-          {!settings.autoExecute && currentStrategy.review?.decision === 'APPROVED' && (
+          {!settings.autoExecute && currentStrategy.review?.approved && (
             <button
               onClick={() => executeStrategy(currentStrategy)}
               className="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
