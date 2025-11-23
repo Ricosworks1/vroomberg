@@ -70,13 +70,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Type coercion: Ensure numeric fields are numbers, not strings
+    const totalBalanceUsd = typeof body.total_balance_usd === 'number'
+      ? body.total_balance_usd
+      : parseFloat(body.total_balance_usd as any) || 0;
+
+    // Ensure token balances are also numbers
+    const validatedTokens = body.tokens.map(token => ({
+      ...token,
+      balance_usd: typeof token.balance_usd === 'number'
+        ? token.balance_usd
+        : parseFloat(token.balance_usd as any) || 0,
+      price_usd: typeof token.price_usd === 'number'
+        ? token.price_usd
+        : parseFloat(token.price_usd as any) || 0,
+    }));
+
     console.log(`Generating strategy for wallet: ${body.wallet_address}`);
 
     // Create portfolio summary for Claude
-    const portfolioSummary = body.tokens
+    const portfolioSummary = validatedTokens
       .map(
         (t) =>
-          `- ${t.token_symbol} (${t.token_name}): ${t.balance} tokens @ $${t.price_usd} = $${t.balance_usd.toFixed(2)}`
+          `- ${t.token_symbol} (${t.token_name}): ${t.balance} tokens @ $${t.price_usd.toFixed(2)} = $${t.balance_usd.toFixed(2)}`
       )
       .join('\n');
 
@@ -89,7 +105,7 @@ export async function POST(request: NextRequest) {
 
 PORTFOLIO ANALYSIS:
 Wallet: ${body.wallet_address}
-Total Balance: $${body.total_balance_usd.toFixed(2)}
+Total Balance: $${totalBalanceUsd.toFixed(2)}
 Market Condition: ${body.market_condition || 'neutral'}
 
 Current Holdings:
