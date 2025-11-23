@@ -23,11 +23,25 @@ interface PortfolioToken {
   protocol?: string;
 }
 
+interface ProtocolPosition {
+  protocol_key: string;
+  protocol_name: string;
+  total_value_usd: number;
+  chains: {
+    [chainKey: string]: {
+      name: string;
+      value: number;
+      positions: any[];
+    };
+  };
+}
+
 interface PortfolioData {
   wallet_address: string;
   total_balance_usd: number;
   tokens: PortfolioToken[];
   chains: string[];
+  protocol_positions?: ProtocolPosition[];
   timestamp: string;
 }
 
@@ -300,6 +314,112 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* DeFi Protocol Positions */}
+            {portfolio.protocol_positions && portfolio.protocol_positions.length > 0 && (
+              <div className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-xl shadow-lg p-6 border-2 border-green-200 dark:border-green-700">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  DeFi Protocol Positions
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                  Your positions across lending protocols, staking platforms, and other DeFi services
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {portfolio.protocol_positions.map((protocol, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white dark:bg-slate-800 rounded-lg p-4 border-2 border-green-200 dark:border-green-700 hover:shadow-lg transition-shadow"
+                    >
+                      {/* Protocol Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                          {protocol.protocol_name}
+                        </h3>
+                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded text-xs font-medium">
+                          {protocol.protocol_key}
+                        </span>
+                      </div>
+
+                      {/* Total Value */}
+                      <div className="mb-3">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Value</p>
+                        <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                          {formatCurrency(protocol.total_value_usd)}
+                        </p>
+                      </div>
+
+                      {/* Chain Breakdown */}
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                          Chains
+                        </p>
+                        {Object.entries(protocol.chains).map(([chainKey, chainData]) => (
+                          <div
+                            key={chainKey}
+                            className="flex items-center justify-between text-sm bg-slate-50 dark:bg-slate-700 rounded px-2 py-1"
+                          >
+                            <span className="text-slate-700 dark:text-slate-300">
+                              {chainData.name}
+                            </span>
+                            <span className="font-mono text-slate-900 dark:text-slate-100">
+                              {formatCurrency(chainData.value)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Position Types */}
+                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase mb-2">
+                          Position Types
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {Object.entries(protocol.chains).flatMap(([_, chainData]) =>
+                            chainData.positions.map((pos: any, posIdx: number) => (
+                              <span
+                                key={posIdx}
+                                className="px-2 py-1 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 rounded text-xs"
+                              >
+                                {pos.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Protocol Summary */}
+                <div className="mt-6 pt-6 border-t border-green-200 dark:border-green-700">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total Protocols</p>
+                      <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                        {portfolio.protocol_positions.length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Total DeFi Value</p>
+                      <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                        {formatCurrency(
+                          portfolio.protocol_positions.reduce((sum, p) => sum + p.total_value_usd, 0)
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Active Chains</p>
+                      <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                        {new Set(
+                          portfolio.protocol_positions.flatMap((p) => Object.keys(p.chains))
+                        ).size}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

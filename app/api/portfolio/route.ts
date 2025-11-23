@@ -17,11 +17,25 @@ interface PortfolioToken {
   protocol?: string;
 }
 
+interface ProtocolPosition {
+  protocol_key: string;
+  protocol_name: string;
+  total_value_usd: number;
+  chains: {
+    [chainKey: string]: {
+      name: string;
+      value: number;
+      positions: any[];
+    };
+  };
+}
+
 interface PortfolioResponse {
   wallet_address: string;
   total_balance_usd: number;
   tokens: PortfolioToken[];
   chains: string[];
+  protocol_positions: ProtocolPosition[];
   timestamp: string;
 }
 
@@ -96,12 +110,39 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
+    // Extract protocol positions from Octav API response
+    // data is an array with one element containing the portfolio data
+    const portfolioItem = Array.isArray(data) ? data[0] : data;
+    const assetByProtocols = portfolioItem?.assetByProtocols || {};
+
+    // Transform protocol positions, excluding "wallet" which is just on-chain holdings
+    const protocolPositions: ProtocolPosition[] = Object.entries(assetByProtocols)
+      .filter(([key]) => key !== 'wallet') // Exclude wallet holdings
+      .map(([protocolKey, protocolData]: [string, any]) => ({
+        protocol_key: protocolKey,
+        protocol_name: protocolData.name || protocolKey,
+        total_value_usd: parseFloat(protocolData.value || '0'),
+        chains: Object.entries(protocolData.chains || {}).reduce(
+          (acc: any, [chainKey, chainData]: [string, any]) => {
+            acc[chainKey] = {
+              name: chainData.name || chainKey,
+              value: parseFloat(chainData.value || '0'),
+              positions: Object.values(chainData.protocolPositions || {}),
+            };
+            return acc;
+          },
+          {}
+        ),
+      }))
+      .filter((position) => position.total_value_usd > 0); // Only include positions with value
+
     // Transform and return clean data to frontend
     const portfolioData: PortfolioResponse = {
       wallet_address: walletAddress,
-      total_balance_usd: data.total_balance_usd || 0,
-      tokens: data.tokens || [],
-      chains: data.chains || [],
+      total_balance_usd: portfolioItem?.networth || portfolioItem?.total_balance_usd || 0,
+      tokens: portfolioItem?.tokens || [],
+      chains: Object.keys(portfolioItem?.chains || {}),
+      protocol_positions: protocolPositions,
       timestamp: new Date().toISOString(),
     };
 
