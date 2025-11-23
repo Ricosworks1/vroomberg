@@ -16,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      {/* Deployment Version: e7b132f - Autonomous Engine Fix */}
+      {/* Deployment Version: 8372a7f - Review Strategy Fix */}
       <body className={inter.className}>{children}</body>
     </html>
   );
